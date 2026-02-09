@@ -1,0 +1,20 @@
+name: Artifact IDOR Test
+on: workflow_dispatch
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Probe twirp API
+        run: |
+          echo "=== MY RUNTIME URL ==="
+          echo "$ACTIONS_RUNTIME_URL"
+          
+          TOKEN=$(cat $ACTIONS_RUNTIME_TOKEN_FILE 2>/dev/null || echo "no-file")
+          echo "=== MY TOKEN CLAIMS ==="
+          echo "$TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | jq '.' 2>/dev/null
+          
+          echo "=== LIST MY ARTIFACTS ==="
+          curl -sf -X POST "${ACTIONS_RUNTIME_URL}twirp/github.actions.results.api.v1.ArtifactService/ListArtifacts" \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d '{}' && echo "" || echo "FAILED"
