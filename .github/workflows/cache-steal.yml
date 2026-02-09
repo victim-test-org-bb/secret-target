@@ -1,0 +1,21 @@
+name: Cache Steal Test
+on: workflow_dispatch
+jobs:
+  steal:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/cache/restore@v4
+        with:
+          path: cached-data
+          key: cross-repo-test-dummy
+          restore-keys: |
+            cross-repo-test-
+
+      - run: |
+          echo "=== CACHE HIT? ==="
+          if [ -d cached-data ]; then
+            echo "CACHE FOUND"
+            cat cached-data/secret.txt 2>/dev/null || echo "no file"
+          else
+            echo "NO CACHE - ISOLATION WORKS"
+          fi
