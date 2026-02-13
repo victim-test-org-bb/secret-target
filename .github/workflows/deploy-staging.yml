@@ -1,0 +1,9 @@
+name: Deploy to staging
+on: 
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: staging
+    steps:
+      - run: echo "Deployed! Secret=${{ secrets.STAGING_SECRET }}"
