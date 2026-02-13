@@ -1,0 +1,7 @@
+name: merge-api-bypass
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "merged via repo merge API"
