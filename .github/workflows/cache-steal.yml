@@ -1,21 +1,20 @@
-name: Cache Steal Test
-on: workflow_dispatch
+name: Cache Test
+on:
+  push:
+    branches: [main]
+  pull_request:
 jobs:
-  steal:
+  cache-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache@v4
         with:
-          path: cached-data
-          key: cross-repo-test-dummy
+          path: ~/.cache/test
+          key: build-cache-${{ hashFiles('**/*.txt') }}
           restore-keys: |
-            cross-repo-test-
-
+            build-cache-
       - run: |
-          echo "=== CACHE HIT? ==="
-          if [ -d cached-data ]; then
-            echo "CACHE FOUND"
-            cat cached-data/secret.txt 2>/dev/null || echo "no file"
-          else
-            echo "NO CACHE - ISOLATION WORKS"
-          fi
+          mkdir -p ~/.cache/test
+          echo "Content from ${{ github.event_name }} on ${{ github.ref }}" > ~/.cache/test/data.txt
+          echo "Actor: ${{ github.actor }}" >> ~/.cache/test/data.txt
+          cat ~/.cache/test/data.txt
