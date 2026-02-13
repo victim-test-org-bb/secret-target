@@ -1,0 +1,15 @@
+name: Reusable Deploy
+on:
+  workflow_call:
+    secrets:
+      DEPLOY_KEY:
+        required: true
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "Secret length: ${#DEPLOY_KEY}"
+          echo "Deploy key starts with: $(echo $DEPLOY_KEY | cut -c1-3)"
+        env:
+          DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
