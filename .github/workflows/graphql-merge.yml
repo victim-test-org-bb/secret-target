@@ -1,0 +1,7 @@
+name: graphql-merge-bypass
+on: push
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "graphql merge bypass"
