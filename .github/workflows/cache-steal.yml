@@ -1,20 +1,40 @@
-name: Cache Test
+name: Cache Isolation Test
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
   pull_request:
+    branches: [main]
+
 jobs:
   cache-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/cache@v4
+      - name: Create test cache
+        uses: actions/cache@v4
         with:
-          path: ~/.cache/test
-          key: build-cache-${{ hashFiles('**/*.txt') }}
+          path: /tmp/test-cache
+          key: isolation-test-${{ github.sha }}
           restore-keys: |
-            build-cache-
-      - run: |
-          mkdir -p ~/.cache/test
-          echo "Content from ${{ github.event_name }} on ${{ github.ref }}" > ~/.cache/test/data.txt
-          echo "Actor: ${{ github.actor }}" >> ~/.cache/test/data.txt
-          cat ~/.cache/test/data.txt
+            isolation-test-
+            
+      - name: Write cache data
+        run: |
+          mkdir -p /tmp/test-cache
+          echo "repo=$GITHUB_REPOSITORY sha=$GITHUB_SHA actor=$GITHUB_ACTOR" > /tmp/test-cache/data.txt
+          echo "Cache written: $(cat /tmp/test-cache/data.txt)"
+          
+      - name: Dump runtime info
+        run: |
+          echo "=== GitHub Context ==="
+          echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
+          echo "GITHUB_EVENT_NAME=$GITHUB_EVENT_NAME"
+          echo "GITHUB_BASE_REF=$GITHUB_BASE_REF"
+          echo "GITHUB_HEAD_REF=$GITHUB_HEAD_REF"
+          echo "GITHUB_REF=$GITHUB_REF"
+          echo "GITHUB_SHA=$GITHUB_SHA"
+          echo ""
+          echo "=== JWT Claims from ACTIONS_RUNTIME_TOKEN ==="
+          # Try to get the token from the cache action's internals
+          env | grep -i "ACTIONS_" | sed 's/=.*/=<redacted>/'
+          echo ""
+          echo "=== Check /home/runner/.cache structure ==="
+          find /home/runner -name "*.json" -path "*actions*" 2>/dev/null | head -5
