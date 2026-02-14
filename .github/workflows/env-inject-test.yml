@@ -1,0 +1,69 @@
+name: Env Injection Test
+on: workflow_dispatch
+
+jobs:
+  inject-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check delimiter mechanism
+        run: |
+          echo "=== GITHUB_ENV file ==="
+          echo "Path: $GITHUB_ENV"
+          echo "Contents before:"
+          cat "$GITHUB_ENV" 2>/dev/null || echo "empty"
+          
+          echo ""
+          echo "=== Test heredoc delimiter ==="
+          # Set a var using the heredoc syntax
+          delimiter="ghadelimiter_$(uuidgen)"
+          echo "TEST_VAR<<$delimiter" >> "$GITHUB_ENV"
+          echo "hello world" >> "$GITHUB_ENV" 
+          echo "$delimiter" >> "$GITHUB_ENV"
+          
+          echo ""
+          echo "Contents after:"
+          cat "$GITHUB_ENV"
+          
+          echo ""
+          echo "=== Try to inject with fake delimiter ==="
+          # Can we inject by using a delimiter that matches the pattern?
+          echo "INJECTED_VAR<<ghadelimiter_00000000-0000-0000-0000-000000000000" >> "$GITHUB_ENV"
+          echo "injected_value" >> "$GITHUB_ENV"
+          echo "ghadelimiter_00000000-0000-0000-0000-000000000000" >> "$GITHUB_ENV"
+          
+          echo ""
+          echo "Final contents:"
+          cat "$GITHUB_ENV"
+          
+      - name: Verify env vars
+        run: |
+          echo "TEST_VAR=$TEST_VAR"
+          echo "INJECTED_VAR=$INJECTED_VAR"
+          
+      - name: Cross-step file command access
+        run: |
+          echo "=== Can we access other steps' file commands? ==="
+          echo "GITHUB_ENV=$GITHUB_ENV"
+          echo "GITHUB_OUTPUT=$GITHUB_OUTPUT"
+          echo "GITHUB_STATE=$GITHUB_STATE"
+          echo "GITHUB_STEP_SUMMARY=$GITHUB_STEP_SUMMARY"
+          
+          echo ""
+          echo "=== All runner file commands ==="
+          ls -la /home/runner/work/_temp/_runner_file_commands/ 2>/dev/null
+          
+          echo ""
+          echo "=== GITHUB_ENV contents from this step ==="
+          cat "$GITHUB_ENV" 2>/dev/null
+          
+  parallel-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Can parallel job read same files?
+        run: |
+          echo "=== Try to read other job temp files ==="
+          # Different jobs get different runners, so this should fail
+          ls -la /home/runner/work/_temp/_runner_file_commands/ 2>/dev/null || echo "Different VM - cannot access"
+          echo ""
+          echo "This job's GITHUB_ENV=$GITHUB_ENV"
+          cat "$GITHUB_ENV" 2>/dev/null
