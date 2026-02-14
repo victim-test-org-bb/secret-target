@@ -1,0 +1,7 @@
+name: created-for-token-test
+on: workflow_dispatch
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "This was merged by GITHUB_TOKEN"
