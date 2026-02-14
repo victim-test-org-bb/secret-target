@@ -1,18 +1,25 @@
-name: PR Target Safe
+name: PR Target VULNERABLE
 on:
   pull_request_target:
     types: [opened, synchronize]
+    branches: [old-vuln-branch]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  safe-check:
+  vuln-check:
     runs-on: ubuntu-latest
     steps:
-      - name: Safe step
+      - name: Checkout PR HEAD (dangerous!)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          
+      - name: Execute PR content
         run: |
-          echo "This is the DEFAULT branch version"
+          echo "This is the VULNERABLE branch version"
           echo "PR: ${{ github.event.pull_request.number }}"
-          echo "Head SHA: ${{ github.event.pull_request.head.sha }}"
-          echo "Source: default branch workflow"
+          echo "Workflow source: old-vuln-branch"
+          echo "If this runs, the Dec 2025 fix can be bypassed"
+          ls -la
