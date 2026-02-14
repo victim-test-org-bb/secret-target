@@ -1,0 +1,15 @@
+name: Deployment Approval Test
+on:
+  workflow_dispatch:
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: secure-prod
+    steps:
+      - name: Access environment secret
+        run: |
+          echo "Environment secret length: ${#DEPLOY_SECRET}"
+          echo "If you see this, approval was bypassed!"
+          echo "Secret starts with: $(echo $DEPLOY_SECRET | head -c 5)***"
+        env:
+          DEPLOY_SECRET: ${{ secrets.DEPLOY_SECRET }}
