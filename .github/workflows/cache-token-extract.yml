@@ -1,0 +1,63 @@
+name: Cache Token Extract
+on: workflow_dispatch
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Use cache action to trigger token
+        uses: actions/cache@v4
+        with:
+          path: /tmp/test-cache
+          key: token-extract-test-${{ github.run_id }}
+          
+      - name: Check how cache got its token
+        run: |
+          echo "=== Check Worker Process Memory for Token URLs ==="
+          WORKER_PID=$(pgrep -f Runner.Worker || true)
+          if [ -n "$WORKER_PID" ]; then
+            # Read /proc/PID/environ - might have internal vars
+            strings /proc/$WORKER_PID/environ 2>/dev/null | grep -iE "ACTIONS_|TOKEN|CACHE|RESULT|RUNTIME" | head -20
+            
+            echo ""
+            echo "=== Worker maps ==="
+            cat /proc/$WORKER_PID/maps 2>/dev/null | grep -i "runner\|cache\|result" | head -10
+            
+            echo ""
+            echo "=== File descriptors ==="
+            ls -la /proc/$WORKER_PID/fd/ 2>/dev/null | head -20
+            
+            echo ""
+            echo "=== Named pipes / sockets ==="
+            find /proc/$WORKER_PID/fd -type l 2>/dev/null | while read fd; do
+              target=$(readlink "$fd" 2>/dev/null)
+              case "$target" in
+                *pipe*|*socket*)
+                  echo "$fd -> $target"
+                  ;;
+              esac
+            done | head -15
+          fi
+          
+          echo ""
+          echo "=== Step output files ==="
+          # The runner passes token via step commands
+          find /home/runner/work/_temp -type f 2>/dev/null | head -20
+          echo ""
+          echo "=== Runner file commands ==="
+          for f in $(find /home/runner/work/_temp/_runner_file_commands -type f 2>/dev/null); do
+            echo "--- $f ---"
+            cat "$f" 2>/dev/null | head -5
+          done
+
+      - name: Check GitHub context for internal state
+        env:
+          GITHUB_CONTEXT: ${{ toJSON(github) }}
+          RUNNER_CONTEXT: ${{ toJSON(runner) }}
+        run: |
+          echo "=== Runner Context ==="
+          echo "$RUNNER_CONTEXT" | python3 -m json.tool 2>/dev/null
