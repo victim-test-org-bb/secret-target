@@ -1,0 +1,7 @@
+name: reverify-repo-merge-v2
+on: workflow_dispatch
+jobs:
+  v:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo repo-merge-v2
