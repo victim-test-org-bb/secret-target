@@ -1,0 +1,52 @@
+name: Checkout V6 Credential Probe
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout with v6
+        uses: actions/checkout@v6
+        
+      - name: Find credential files
+        run: |
+          echo "=== Git config ==="
+          cat .git/config
+          
+          echo ""
+          echo "=== Files in RUNNER_TEMP ==="
+          find "$RUNNER_TEMP" -type f 2>/dev/null
+          
+          echo ""
+          echo "=== Git credential files ==="
+          find "$RUNNER_TEMP" -name "*credentials*" -o -name "*git*" -o -name "*.extraheader" 2>/dev/null | while read f; do
+            echo "--- $f ---"
+            cat "$f" 2>/dev/null | head -5
+          done
+          
+          echo ""
+          echo "=== Global git config ==="
+          cat ~/.gitconfig 2>/dev/null
+          
+          echo ""
+          echo "=== All includeIf configs ==="
+          git config --global --list 2>/dev/null | grep -i include
+          git config --list --show-origin 2>/dev/null | grep -i "include\|credential\|extraheader"
+
+      - name: Check if credential file is accessible from different directory
+        run: |
+          cd /tmp
+          echo "=== Can we access credentials from /tmp? ==="
+          # The includeIf should only work for the specific repo URL
+          git config --global --list 2>/dev/null | grep -i "credential\|extraheader\|include"
+          
+          echo ""
+          echo "=== Enumerate all git config files ==="
+          find / -name "gitconfig" -o -name ".gitconfig" -o -name "git-credentials" 2>/dev/null | head -10
+          
+          echo ""
+          echo "=== All files with 'extraheader' content ==="
+          grep -rl "extraheader" "$RUNNER_TEMP" /home/runner 2>/dev/null | head -10
