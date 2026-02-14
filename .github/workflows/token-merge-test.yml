@@ -1,0 +1,60 @@
+name: GITHUB_TOKEN Merge Test
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  pull-requests: write
+jobs:
+  test-self-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Create branch with workflow file
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Create a branch
+          git checkout -b token-merge-test
+          
+          # Try to create a workflow file directly (should fail)
+          mkdir -p .github/workflows
+          cat > .github/workflows/token-created.yml << 'YML'
+          name: created-by-token
+          on: workflow_dispatch
+          jobs:
+            t:
+              runs-on: ubuntu-latest
+              steps:
+                - run: echo "created by GITHUB_TOKEN merge"
+          YML
+          
+          git add .github/workflows/token-created.yml
+          git config user.email "test@test.com"
+          git config user.name "Test"
+          git commit -m "add workflow via branch"
+          
+          echo "=== Try direct push (should fail) ==="
+          git push origin token-merge-test 2>&1 || echo "Direct push blocked (expected)"
+          
+          echo ""
+          echo "=== Try merge API with GITHUB_TOKEN ==="
+          # First push without workflow file, then create PR
+          git checkout main
+          git checkout -b token-merge-test-clean
+          echo "clean" > clean-file.txt
+          git add clean-file.txt
+          git commit -m "clean commit"
+          git push origin token-merge-test-clean
+          
+      - name: Test merge API
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "GITHUB_TOKEN permissions:"
+          echo "${{ toJSON(github.token) }}" | head -c 20
+          echo "..."
+          
+          # Check what the token can do
+          curl -sI -H "Authorization: token $GH_TOKEN" \
+            https://api.github.com/repos/${{ github.repository }} | grep x-oauth-scopes || echo "No classic scopes (fine-grained)"
