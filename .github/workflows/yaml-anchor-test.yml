@@ -1,0 +1,28 @@
+name: YAML Anchor Security Test
+on: workflow_dispatch
+
+# Test: Can anchors be used to inject content into unexpected places?
+env:
+  SAFE_VAR: &safe_value "hello"
+  ANCHOR_TEST: &anchor_payload "$(whoami)"
+
+jobs:
+  test-injection:
+    runs-on: ubuntu-latest
+    env:
+      INJECTED: *anchor_payload
+      SAFE: *safe_value
+    steps:
+      - name: Check if anchor expands commands
+        run: |
+          echo "INJECTED=$INJECTED"
+          echo "SAFE=$SAFE"
+          echo "Does anchor expand shell commands? No - just string substitution"
+          
+  test-anchor-override:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Test anchor in run commands
+        run: |
+          echo "Testing if anchors can override step execution"
+          echo "SAFE_VAR from workflow env: $SAFE_VAR"
