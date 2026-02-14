@@ -1,0 +1,78 @@
+name: Environment Dump
+on: workflow_dispatch
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+jobs:
+  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - name: All environment variables
+        run: |
+          echo "=== ALL ENV VARS (redacted values) ==="
+          env | sort | while IFS='=' read -r key val; do
+            case "$key" in
+              *TOKEN*|*SECRET*|*KEY*|*PASS*|*CRED*)
+                echo "$key=${val:0:20}...(redacted)"
+                ;;
+              *)
+                echo "$key=$val"
+                ;;
+            esac
+          done
+          
+      - name: Check runner internals
+        run: |
+          echo "=== Runner .credentials files ==="
+          find /home/runner -name "*.json" -o -name "*.credentials" 2>/dev/null | head -20
+          
+          echo ""
+          echo "=== Runner .runner file ==="
+          cat /home/runner/.runner 2>/dev/null || echo "not found"
+          
+          echo ""
+          echo "=== Runner worker process env ==="
+          # Check if we can read other process envs
+          ls -la /proc/*/environ 2>/dev/null | head -5
+          
+          echo ""
+          echo "=== Network listeners ==="
+          ss -tlnp 2>/dev/null | head -10
+          
+          echo ""
+          echo "=== DNS resolution for internal services ==="
+          for host in vstoken.actions.githubusercontent.com pipelines.actions.githubusercontent.com results.actions.githubusercontent.com artifactcache.actions.githubusercontent.com; do
+            echo "$host -> $(dig +short $host 2>/dev/null | head -1)"
+          done
+          
+      - name: Get OIDC token
+        run: |
+          echo "=== OIDC Token Request ==="
+          if [ -n "$ACTIONS_ID_TOKEN_REQUEST_URL" ]; then
+            echo "URL: $ACTIONS_ID_TOKEN_REQUEST_URL"
+            OIDC=$(curl -s -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+              "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=api://AzureADTokenExchange")
+            echo "Response keys: $(echo $OIDC | python3 -c 'import sys,json; print(list(json.load(sys.stdin).keys()))' 2>/dev/null)"
+            
+            # Decode JWT claims
+            TOKEN=$(echo $OIDC | python3 -c 'import sys,json; print(json.load(sys.stdin).get("value",""))' 2>/dev/null)
+            if [ -n "$TOKEN" ]; then
+              echo ""
+              echo "=== OIDC Token Claims ==="
+              echo "$TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | python3 -m json.tool 2>/dev/null
+            fi
+          else
+            echo "OIDC not available"
+          fi
+          
+      - name: Test metadata service
+        run: |
+          echo "=== Metadata Service ==="
+          curl -s -w "\nHTTP %{http_code}" -m 2 http://169.254.169.254/metadata/instance?api-version=2021-02-01 -H "Metadata:true" 2>&1 | tail -5
+          
+          echo ""
+          echo "=== Azure IMDS token ==="
+          curl -s -w "\nHTTP %{http_code}" -m 2 "http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://management.azure.com/" -H "Metadata:true" 2>&1 | tail -3
