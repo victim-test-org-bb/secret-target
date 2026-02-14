@@ -1,0 +1,7 @@
+name: no-ff-merge-test
+on: workflow_dispatch
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "no-ff merge test"
