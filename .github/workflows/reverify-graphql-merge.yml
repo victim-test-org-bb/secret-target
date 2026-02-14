@@ -1,0 +1,7 @@
+name: reverify-graphql-merge
+on: workflow_dispatch
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo 'This workflow was merged via reverify-graphql-merge bypass'
