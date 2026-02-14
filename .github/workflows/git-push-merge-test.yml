@@ -1,0 +1,7 @@
+name: git-push-merge-test
+on: workflow_dispatch
+jobs:
+  t:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "pushed via git merge + push"
